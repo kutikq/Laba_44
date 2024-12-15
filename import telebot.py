@@ -24,23 +24,23 @@ def send_welcome(message):
 
 # Поиск по названию
 def search_by_name(name):
-    result = df[df['name'].str.contains(name, case=False, na=False)]
+    result = df_cleaned[df_cleaned['name'].str.contains(name, case=False, na=False)]
     return result
 
 # Поиск по жанру
 def search_by_genre(genre):
-    result = df[df['genre'].str.contains(genre, case=False, na=False)]
+    result = df_cleaned[df_cleaned['genre'].str.contains(genre, case=False, na=False)]
     return result
 
 # Вывод топ 30 по рейтингу
 def show_top100_rait():
-    top_30_r = df.sort_values(by='rating', ascending=False)  # Сортировка по убыванию
+    top_30_r = df_cleaned.sort_values(by='rating', ascending=False)  # Сортировка по убыванию
     result = top_30_r.head(30)
     return result
 
 # Топ 30 по зрителям
 def show_most_popular():
-    top_30_m = df.sort_values(by='members', ascending=False)  # Сортировка по убыванию
+    top_30_m = df_cleaned.sort_values(by='members', ascending=False)  # Сортировка по убыванию
     result = top_30_m.head(30)
     return result
 
