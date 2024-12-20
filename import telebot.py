@@ -62,7 +62,7 @@ def get_top30_by_popularity():
 def search_by_name(name):
     query = '''
     query ($name: String) {
-      Page(perPage: 5) {
+      Page(perPage: 10) {
         media(search: $name) {
           title {
             romaji
@@ -88,7 +88,7 @@ def search_by_name(name):
 def search_by_genre(genre):
     query = '''
     query ($genre: String) {
-      Page(perPage: 5) {
+      Page(perPage: 10) {
         media(genre: $genre) {
           title {
             romaji
@@ -178,6 +178,16 @@ def handle_most_popular(message):
         bot.reply_to(message, result_text)
     else:
         bot.reply_to(message, "Не удалось получить данные для топ-30 по популярности.")
+
+# Обработчик для неизвестных команд
+@bot.message_handler(func=lambda message: True)
+def handle_unknown_command(message):
+    bot.reply_to(message, "Извините, я не понимаю эту команду. Попробуйте использовать одну из следующих команд:\n"
+                          "/start - начать\n"
+                          "/search_by_name <название> - поиск по названию\n"
+                          "/search_by_genre <жанр> - поиск по жанру\n"
+                          "/top30 - топ-30 аниме по рейтингу\n"
+                          "/most_popular - топ-30 аниме по количеству зрителей")
 
 # Запуск бота
 bot.polling()
