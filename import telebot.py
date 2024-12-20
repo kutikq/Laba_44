@@ -1,17 +1,114 @@
 import telebot
-import pandas as pd
+import requests
 
 # Вставьте токен вашего бота
 TOKEN = '7666309174:AAFjvARXjuwd0Hdm-0ZQI6ziafN1umo37GI'
 bot = telebot.TeleBot(TOKEN)
 
-# Загрузите датасет
-df = pd.read_csv('anime.csv')
-# Удалить строки с пропущенными значениями
-df_cleaned = df.dropna()
+# URL для AniList GraphQL API
+ANILIST_API_URL = "https://graphql.anilist.co"
 
-# Просмотрите первые 5 строк
-print(df.head())
+# GraphQL запрос для получения топ-30 по рейтингу
+def get_top30_by_rating():
+    query = '''
+    {
+      Page(perPage: 30) {
+        media(sort: SCORE_DESC) {
+          title {
+            romaji
+            english
+            native
+          }
+          averageScore
+        }
+      }
+    }
+    '''
+    response = requests.post(ANILIST_API_URL, json={'query': query})
+    
+    if response.status_code == 200:
+        data = response.json()
+        return data['data']['Page']['media']
+    else:
+        print(f"Ошибка при запросе к AniList API: {response.status_code}")
+        return []
+
+# GraphQL запрос для получения топ-30 по популярности
+def get_top30_by_popularity():
+    query = '''
+    {
+      Page(perPage: 30) {
+        media(sort: POPULARITY_DESC) {
+          title {
+            romaji
+            english
+            native
+          }
+          popularity
+        }
+      }
+    }
+    '''
+    response = requests.post(ANILIST_API_URL, json={'query': query})
+    
+    if response.status_code == 200:
+        data = response.json()
+        return data['data']['Page']['media']
+    else:
+        print(f"Ошибка при запросе к AniList API: {response.status_code}")
+        return []
+
+# Поиск аниме по названию
+def search_by_name(name):
+    query = '''
+    query ($name: String) {
+      Page(perPage: 5) {
+        media(search: $name) {
+          title {
+            romaji
+            english
+            native
+          }
+          averageScore
+        }
+      }
+    }
+    '''
+    variables = {'name': name}
+    response = requests.post(ANILIST_API_URL, json={'query': query, 'variables': variables})
+    
+    if response.status_code == 200:
+        data = response.json()
+        return data['data']['Page']['media']
+    else:
+        print(f"Ошибка при запросе к AniList API: {response.status_code}")
+        return []
+
+# Поиск аниме по жанру
+def search_by_genre(genre):
+    query = '''
+    query ($genre: String) {
+      Page(perPage: 5) {
+        media(genre: $genre) {
+          title {
+            romaji
+            english
+            native
+          }
+          averageScore
+        }
+      }
+    }
+    '''
+    variables = {'genre': genre}
+    response = requests.post(ANILIST_API_URL, json={'query': query, 'variables': variables})
+    
+    if response.status_code == 200:
+        data = response.json()
+        return data['data']['Page']['media']
+    else:
+        print(f"Ошибка при запросе к AniList API: {response.status_code}")
+        return []
 
 # Декоратор команды /start
 @bot.message_handler(commands=['start'])
@@ -20,29 +117,7 @@ def send_welcome(message):
                           "/search_by_name <название> - поиск по названию\n"
                           "/search_by_genre <жанр> - поиск по жанру\n"
                           "/top30 - топ-30 аниме по рейтингу\n"
-                          "/most_popular - топ-30 аниме по количеству зрителей")
-
-# Поиск по названию
-def search_by_name(name):
-    result = df_cleaned[df_cleaned['name'].str.contains(name, case=False, na=False)]
-    return result
-
-# Поиск по жанру
-def search_by_genre(genre):
-    result = df_cleaned[df_cleaned['genre'].str.contains(genre, case=False, na=False)]
-    return result
-
-# Вывод топ 30 по рейтингу
-def show_top100_rait():
-    top_30_r = df_cleaned.sort_values(by='rating', ascending=False)  # Сортировка по убыванию
-    result = top_30_r.head(30)
-    return result
-
-# Топ 30 по зрителям
-def show_most_popular():
-    top_30_m = df_cleaned.sort_values(by='members', ascending=False)  # Сортировка по убыванию
-    result = top_30_m.head(30)
-    return result
+                          "/most_popular - топ-30 аниме по популярности")
 
 # Обработчик команды /search_by_name
 @bot.message_handler(commands=['search_by_name'])
@@ -50,10 +125,11 @@ def handle_search_by_name(message):
     query = message.text[len('/search_by_name '):]  # Извлекаем запрос после команды
     if query:
         results = search_by_name(query)
-        if not results.empty:
+        if results:
             result_text = f"Найдено аниме по запросу '{query}':\n"
-            for _, row in results.head(5).iterrows():  # Отображаем только первые 5 результатов
-                result_text += f"{row['name']} - Рейтинг: {row['rating']}\n"
+            for anime in results:
+                title = anime['title']['romaji'] if anime['title']['romaji'] else anime['title']['english']
+                result_text += f"{title} - Рейтинг: {anime['averageScore']}\n"
             bot.reply_to(message, result_text)
         else:
             bot.reply_to(message, f"По запросу '{query}' ничего не найдено.")
@@ -66,10 +142,11 @@ def handle_search_by_genre(message):
     query = message.text[len('/search_by_genre '):]  # Извлекаем запрос после команды
     if query:
         results = search_by_genre(query)
-        if not results.empty:
-            result_text = f"Найдено аниме по запросу '{query}':\n"
-            for _, row in results.head(5).iterrows():  # Отображаем только первые 5 результатов
-                result_text += f"{row['genre']} - Рейтинг: {row['rating']}\n"
+        if results:
+            result_text = f"Найдено аниме по жанру '{query}':\n"
+            for anime in results:
+                title = anime['title']['romaji'] if anime['title']['romaji'] else anime['title']['english']
+                result_text += f"{title} - Рейтинг: {anime['averageScore']}\n"
             bot.reply_to(message, result_text)
         else:
             bot.reply_to(message, f"По запросу '{query}' ничего не найдено.")
@@ -78,21 +155,29 @@ def handle_search_by_genre(message):
 
 # Обработчик команды /top30
 @bot.message_handler(commands=['top30'])
-def handle_top100(message):
-    results = show_top100_rait()
-    result_text = "Топ 30 аниме по рейтингу:\n"
-    for _, row in results.iterrows():
-        result_text += f"{row['name']} - Рейтинг: {row['rating']}\n"
-    bot.reply_to(message, result_text)
+def handle_top30(message):
+    results = get_top30_by_rating()
+    if results:
+        result_text = "Топ 30 аниме по рейтингу:\n"
+        for anime in results:
+            title = anime['title']['romaji'] if anime['title']['romaji'] else anime['title']['english']
+            result_text += f"{title} - Рейтинг: {anime['averageScore']}\n"
+        bot.reply_to(message, result_text)
+    else:
+        bot.reply_to(message, "Не удалось получить данные для топ-30 по рейтингу.")
 
 # Обработчик команды /most_popular
 @bot.message_handler(commands=['most_popular'])
 def handle_most_popular(message):
-    results = show_most_popular()
-    result_text = "Топ 30 аниме по количеству зрителей:\n"
-    for _, row in results.iterrows():
-        result_text += f"{row['name']} - Зрители: {row['members']}\n"
-    bot.reply_to(message, result_text)
+    results = get_top30_by_popularity()
+    if results:
+        result_text = "Топ 30 аниме по популярности:\n"
+        for anime in results:
+            title = anime['title']['romaji'] if anime['title']['romaji'] else anime['title']['english']
+            result_text += f"{title} - Популярность: {anime['popularity']}\n"
+        bot.reply_to(message, result_text)
+    else:
+        bot.reply_to(message, "Не удалось получить данные для топ-30 по популярности.")
 
 # Запуск бота
 bot.polling()
